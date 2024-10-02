@@ -1,17 +1,18 @@
 import os
 import time
 import random
+import logging
 
 from tabulate import tabulate
 from playwright.sync_api import sync_playwright
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 USERNAME = os.environ.get("USERNAME")
 PASSWORD = os.environ.get("PASSWORD")
 
-
 HOME_URL = "https://linux.do/"
-
 
 class LinuxDoBrowser:
     def __init__(self) -> None:
@@ -22,6 +23,7 @@ class LinuxDoBrowser:
         self.page.goto(HOME_URL)
 
     def login(self):
+        logging.info("Attempting to log in")
         self.page.click(".login-button .d-button-label")
         time.sleep(2)
         self.page.fill("#login-account-name", USERNAME)
@@ -32,16 +34,21 @@ class LinuxDoBrowser:
         time.sleep(10)
         user_ele = self.page.query_selector("#current-user")
         if not user_ele:
-            print("Login failed")
+            logging.error("Login failed")
             return False
         else:
-            print("Check in success")
+            logging.info("Check in success")
             return True
 
     def click_topic(self):
-        for topic in self.page.query_selector_all("#list-area .title"):
+        topics = self.page.query_selector_all("#list-area .title")
+        logging.info(f"Found {len(topics)} topics on the page")
+        for topic in topics:
+            title = topic.inner_text()
+            href = topic.get_attribute("href")
+            logging.info(f"Clicking into topic: {title} (URL: {HOME_URL + href})")
             page = self.context.new_page()
-            page.goto(HOME_URL + topic.get_attribute("href"))
+            page.goto(HOME_URL + href)
             time.sleep(3)
             if random.random() < 0.02:  # 100 * 0.02 * 30 = 60
                 self.click_like(page)
@@ -56,9 +63,10 @@ class LinuxDoBrowser:
 
     def click_like(self, page):
         page.locator(".discourse-reactions-reaction-button").first.click()
-        print("Like success")
+        logging.info(f"Clicked like on topic: {page.title()}")
 
     def print_connect_info(self):
+        logging.info("Fetching connect info")
         page = self.context.new_page()
         page.goto("https://connect.linux.do/")
         rows = page.query_selector_all("table tr")
@@ -73,15 +81,14 @@ class LinuxDoBrowser:
                 requirement = cells[2].text_content().strip()
                 info.append([project, current, requirement])
 
-        print("--------------Connect Info-----------------")
-        print(tabulate(info, headers=["项目", "当前", "要求"], tablefmt="pretty"))
+        logging.info("--------------Connect Info-----------------")
+        logging.info("\n" + tabulate(info, headers=["项目", "当前", "要求"], tablefmt="pretty"))
 
         page.close()
 
-
 if __name__ == "__main__":
     if not USERNAME or not PASSWORD:
-        print("Please set USERNAME and PASSWORD")
+        logging.error("Please set USERNAME and PASSWORD")
         exit(1)
     l = LinuxDoBrowser()
     l.run()
