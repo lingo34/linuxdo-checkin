@@ -41,8 +41,15 @@ class LinuxDoBrowser:
             return True
 
     def click_topic(self):
+        logging.info("Waiting for topics to load...")
+        self.page.wait_for_selector("#list-area .title", timeout=10000)  # Wait for the topic list to load
         topics = self.page.query_selector_all("#list-area .title")
-        logging.info(f"Found {len(topics)} topics on the page")
+        
+        if not topics:
+            logging.error("No topics found on the page.")
+        else:
+            logging.info(f"Found {len(topics)} topics on the page")
+        
         for topic in topics:
             title = topic.inner_text()
             href = topic.get_attribute("href")
@@ -62,15 +69,22 @@ class LinuxDoBrowser:
         self.print_connect_info()
 
     def click_like(self, page):
-        page.locator(".discourse-reactions-reaction-button").first.click()
-        logging.info(f"Clicked like on topic: {page.title()}")
+        like_button = page.locator(".discourse-reactions-reaction-button").first
+        if like_button:
+            like_button.click()
+            logging.info(f"Clicked like on topic: {page.title()}")
+        else:
+            logging.warning("Like button not found on the page.")
 
     def print_connect_info(self):
         logging.info("Fetching connect info")
         page = self.context.new_page()
         page.goto("https://connect.linux.do/")
+        
+        logging.info("Waiting for table to load...")
+        page.wait_for_selector("table", timeout=10000)  # Wait for the table to load
+        
         rows = page.query_selector_all("table tr")
-
         info = []
 
         for row in rows:
@@ -81,8 +95,11 @@ class LinuxDoBrowser:
                 requirement = cells[2].text_content().strip()
                 info.append([project, current, requirement])
 
-        logging.info("--------------Connect Info-----------------")
-        logging.info("\n" + tabulate(info, headers=["项目", "当前", "要求"], tablefmt="pretty"))
+        if info:
+            logging.info("--------------Connect Info-----------------")
+            logging.info("\n" + tabulate(info, headers=["项目", "当前", "要求"], tablefmt="pretty"))
+        else:
+            logging.error("No information found in the table.")
 
         page.close()
 
